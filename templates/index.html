@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Quizineer</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        .badge-container {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .badge {
+            width: 100px;
+            height: 50px;
+            border-radius: 5px;
+            margin: 5px;
+            background-color: gold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .badge span {
+            font-size: 12px;
+            text-align: center;
+        }
+        .progress-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+        .story-container {
+            width: 100%;
+            margin-top: 40px;
+        }
+        .story {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            height: 256px;
+        }
+        .story img {
+            width: 256px;
+            height: 256px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        .story-content {
+            flex: 1;
+            overflow: hidden;
+        }
+        .story-content p {
+            margin: 0;
+        }
+        .task-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+        .task {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+        }
+        .response-container {
+            width: 100%;
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        .response-container pre {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Quizineer</h1>
+        <form id="quiz-form">
+            <div class="form-group">
+                <label for="question">問題</label>
+                <textarea class="form-control" id="question" rows="2" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="options">選択肢</label>
+                <div id="options">
+                    <div class="input-group mb-2 option-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">A</span>
+                        </div>
+                        <input type="text" class="form-control option" placeholder="選択肢 A" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">分析</span>
+                        </div>
+                        <input type="text" class="form-control suggestion" readonly>
+                    </div>
+                    <div class="input-group mb-2 option-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">B</span>
+                        </div>
+                        <input type="text" class="form-control option" placeholder="選択肢 B" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">分析</span>
+                        </div>
+                        <input type="text" class="form-control suggestion" readonly>
+                    </div>
+                    <div class="input-group mb-2 option-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">C</span>
+                        </div>
+                        <input type="text" class="form-control option" placeholder="選択肢 C" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">分析</span>
+                        </div>
+                        <input type="text" class="form-control suggestion" readonly>
+                    </div>
+                    <div class="input-group mb-2 option-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">D</span>
+                        </div>
+                        <input type="text" class="form-control option" placeholder="選択肢 D" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">分析</span>
+                        </div>
+                        <input type="text" class="form-control suggestion" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="answer">正解</label>
+                <input type="text" class="form-control" id="answer" required>
+            </div>
+            <button type="button" class="btn btn-success" id="improve-question">問題改善</button>
+            <button type="button" class="btn btn-warning" id="enhance-question">難易度向上</button>
+            <button type="button" class="btn btn-info" id="validate-question">問題検証</button>
+            <button type="button" class="btn btn-danger" id="reset-tasks">タスクリセット</button>
+        </form>
+        <div class="response-container">
+            <h3>回答内容</h3>
+            <pre id="response-text"></pre>
+        </div>
+        <div class="progress-container">
+            <h3>進捗: <span id="progress-text">0/5</span></h3>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" style="width: 0%;" id="progress-bar" aria-valuemin="0" aria-valuemax="5"></div>
+            </div>
+        </div>
+        <div class="badge-container" id="badge-container"></div>
+        <div class="task-container">
+            <h3>現在のタスク</h3>
+            <div id="tasks"></div>
+        </div>
+        <div class="story-container" id="story-container">
+            <h3>ストーリー進行</h3>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+        function mapTaskType(type) {
+            const mapping = {
+                "improve": "問題改善",
+                "enhance": "難易度向上",
+                "validate": "問題検証"
+            };
+            return mapping[type] || type;
+        }
+
+
+        let currentTask = null;
+        let tasksCompleted = 0;
+        let totalTasks = 5;
+        let storyEnded = false;
+
+        function fetchResponse(endpoint, taskType) {
+            if (storyEnded) {
+                alert("ストーリーは終了しました。再スタートするには『タスクリセット』ボタンをクリックしてください。");
+                return;
+            }
+            let question = document.getElementById('question').value;
+            let options = Array.from(document.getElementsByClassName('option')).map(option => option.value);
+            let answer = document.getElementById('answer').value;
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, options, answer })
+            })
+            .then(response => response.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    if (data.error) {
+                        document.getElementById('response-text').textContent = `エラー: ${data.error}`;
+                    } else {
+                        document.getElementById('response-text').textContent = data.text;
+                        if (data.suggestions) {
+                            const suggestions = document.getElementsByClassName('suggestion');
+                            const suggestionTexts = data.suggestions;
+                            for (let i = 0; i < suggestions.length; i++) {
+                                suggestions[i].value = suggestionTexts[i];
+                            }
+                        }
+                        if (currentTask && currentTask.type === taskType) {
+                            markTaskCompleted();
+                        }
+                    }
+                } catch (e) {
+                    document.getElementById('response-text').textContent = 'JSON解析エラー:\n' + text;
+                }
+            })
+            .catch(error => {
+                console.error('エラー:', error);
+                document.getElementById('response-text').textContent = 'リクエスト処理中にエラーが発生しました。';
+            });
+        }
+
+
+        function markTaskCompleted() {
+            tasksCompleted++;
+            updateProgress();
+            const tasksContainer = document.getElementById('tasks');
+            tasksContainer.innerHTML = '';
+            const taskElement = document.createElement('div');
+            taskElement.className = 'task';
+            taskElement.innerHTML = `
+                <p>タスク内容: ${currentTask.description}</p>
+                <p>タスクタイプ: ${mapTaskType(currentTask.type)}</p>
+                <p>状態: 完了</p>
+            `;
+            tasksContainer.appendChild(taskElement);
+            if (tasksCompleted >= totalTasks) {
+                const previous_story = Array.from(document.getElementsByClassName('story-content'))
+                    .map(storyDiv => storyDiv.innerText)
+                    .join('\n');
+                fetch('/generate-ending', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ previous_story })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('結末生成中のエラー:', data.error);
+                    } else {
+                        addStory(data.ending, data.image_url, '結末');
+                        storyEnded = true;
+                        document.getElementById('tasks').innerHTML = '<p>ストーリーは終了しました。再スタートするには「タスクリセット」ボタンを押してください。</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('エラー:', error);
+                });
+            } else {
+                const question = document.getElementById('question').value;
+                const previous_story = Array.from(document.getElementsByClassName('story-content'))
+                    .map(storyDiv => storyDiv.innerText)
+                    .join('\n');
+                fetchStory(null, question, previous_story);
+            }
+        }
+
+        function fetchStory(taskIndex, question, previous_story) {
+            if (storyEnded) { return; }
+            fetch('/generate-story', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskIndex, question, previous_story })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('ストーリー生成中のエラー:', data.error);
+                } else {
+                    addStory(data.story, data.image_url);
+                    let taskDescription = data.task;
+                    let taskType = data.task_type;
+                    if (!taskType) {
+                        taskType = 'improve';
+                    }
+                    addTask(taskDescription, taskType);
+                }
+            })
+            .catch(error => {
+                console.error('エラー:', error);
+            });
+        }
+
+        function addTask(taskDescription, taskType) {
+            currentTask = { description: taskDescription, type: taskType };
+            const tasksContainer = document.getElementById('tasks');
+            tasksContainer.innerHTML = '';
+            const taskElement = document.createElement('div');
+            taskElement.className = 'task';
+            taskElement.innerHTML = `
+                <p>タスク内容: ${taskDescription}</p>
+                <p>タスクタイプ: ${mapTaskType(taskType)}</p>
+                <p>状態: 未完了</p>
+            `;
+            tasksContainer.appendChild(taskElement);
+        }
+
+        function addStory(storyText, imageUrl, title = '新しい進展') {
+            const storyContainer = document.getElementById('story-container');
+            const storyElement = document.createElement('div');
+            storyElement.className = 'story';
+            let imageHtml = '';
+            if (imageUrl) {
+                imageHtml = `<img src="${imageUrl}" alt="ストーリー画像">`;
+            }
+            storyElement.innerHTML = `
+                <div class="story-content">
+                    <h4>${title}</h4>
+                    <p>${storyText}</p>
+                </div>
+                ${imageHtml}
+            `;
+            storyContainer.appendChild(storyElement);
+        }
+
+        function updateProgress() {
+            const progress = (tasksCompleted / totalTasks) * 100;
+            document.getElementById('progress-text').innerText = `${tasksCompleted}/${totalTasks}`;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+
+        document.getElementById('improve-question').addEventListener('click', function(event) {
+            event.preventDefault();
+            fetchResponse('/improve', 'improve');
+        });
+
+        document.getElementById('enhance-question').addEventListener('click', function() {
+            fetchResponse('/enhance', 'enhance');
+        });
+
+        document.getElementById('validate-question').addEventListener('click', function() {
+            fetchResponse('/validate', 'validate');
+        });
+
+        document.getElementById('reset-tasks').addEventListener('click', function() {
+            tasksCompleted = 0;
+            updateProgress();
+            currentTask = null;
+            storyEnded = false;
+            document.getElementById('tasks').innerHTML = '';
+            document.getElementById('story-container').innerHTML = `<h3>ストーリー進行</h3>`;
+            const question = document.getElementById('question').value || "ストーリー開始用のサンプル問題。";
+            const previous_story = '';
+            fetch('/generate-story', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskIndex: null, question, previous_story })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('ストーリー生成中のエラー:', data.error);
+                } else {
+                    addStory(data.story, data.image_url, '始まり');
+                    let taskDescription = data.task;
+                    let taskType = data.task_type;
+                    if (!taskType) {
+                        taskType = 'improve';
+                    }
+                    addTask(taskDescription, taskType);
+                }
+            })
+            .catch(error => {
+                console.error('エラー:', error);
+            });
+        });
+
+        window.onload = function() {
+            const question = document.getElementById('question').value || "ストーリー開始用のサンプル問題。";
+            const previous_story = '';
+            fetch('/generate-story', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskIndex: null, question, previous_story })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('ストーリー生成中のエラー:', data.error);
+                } else {
+                    document.getElementById('story-container').innerHTML = `<h3>ストーリー進行</h3>`;
+                    addStory(data.story, data.image_url, '始まり');
+                    let taskDescription = data.task;
+                    let taskType = data.task_type;
+                    if (!taskType) {
+                        taskType = 'improve';
+                    }
+                    addTask(taskDescription, taskType);
+                }
+            })
+            .catch(error => {
+                console.error('エラー:', error);
+            });
+            updateProgress();
+        }
+    </script>
+</body>
+</html>
